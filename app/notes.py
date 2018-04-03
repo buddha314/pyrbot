@@ -1,15 +1,20 @@
 import pybullet as p
 import numpy as np
+import math
 import time
 import pybullet_data
 
 DURATION = 10000
 R2_SPEED = 300
-DUCK_SPEED = 200
+DUCK_SPEED = 5
+DUCK_RADIUS = 6
+DUCK_FLIGHT_ALTITUDE = 0.5
 
-def runLikeDuck() {
-    
-}
+def runLikeDuck(i, currentPos) :
+    v = DUCK_RADIUS*np.array([math.cos((i+1)/180), math.sin((i+1)/180), DUCK_FLIGHT_ALTITUDE]) - np.array(currentPos)
+    #v = DUCK_RADIUS*np.array([math.cos(i/360.), math.sin(i/360.), 0])
+    print(v)
+    return v
 
 
 physicsClient = p.connect(p.GUI)#or p.DIRECT for non-graphical version
@@ -29,14 +34,16 @@ for i in range (DURATION):
     oid, lk, frac, pos, norm = p.rayTest(cubePos, gemPos)[0]
     #rt = p.rayTest(cubePos, gemPos)
     #print("rayTest: %s" % rt[0][1])
-    print("rayTest: Norm: ")
-    print(norm)
-    cubeVec = np.array([R2_SPEED * (gemPos[i]-cubePos[i]) for i in range(len(gemPos))])
-    duckVec = np.array([-DUCK_SPEED * (gemPos[i]-cubePos[i]) for i in range(len(gemPos))])
+    #print("rayTest: Norm: ")
+    #print(norm)
+    cubeVec = np.array([R2_SPEED * (gemPos[k]-cubePos[k]) for k in range(len(gemPos))])
+    #duckVec = np.array([-DUCK_SPEED * (gemPos[i]-cubePos[i]) for i in range(len(gemPos))])
+    duckVec = runLikeDuck(i, gemPos)
     #vec = p.getQuaternionFromEuler([300*(gemPos[0] - cubePos[0]), 300*(gemPos[1] - cubePos[1]), 0])
+
     p.applyExternalForce(objectUniqueId=boxId, linkIndex=-1, forceObj=cubeVec
         ,posObj=pos, flags=p.WORLD_FRAME)
     p.applyExternalForce(objectUniqueId=gemId, linkIndex=-1, forceObj=duckVec
-        ,posObj=pos, flags=p.WORLD_FRAME)
+        ,posObj=gemPos, flags=p.WORLD_FRAME)
 print(cubePos,cubeOrn)
 p.disconnect()
