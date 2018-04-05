@@ -7,11 +7,11 @@ import pybullet_data
 DURATION = 10000
 R2_SPEED = 300
 DUCK_SPEED = 5
-DUCK_RADIUS = 6
+DUCK_RADIUS = 4
 DUCK_FLIGHT_ALTITUDE = 0.5
 
 def runLikeDuck(i, currentPos) :
-    v = DUCK_RADIUS*np.array([math.cos((i+1)/180), math.sin((i+1)/180), DUCK_FLIGHT_ALTITUDE]) - np.array(currentPos)
+    v = DUCK_SPEED * (DUCK_RADIUS*np.array([math.cos((i+1)/180), math.sin((i+1)/180), DUCK_FLIGHT_ALTITUDE]) - np.array(currentPos))
     #v = DUCK_RADIUS*np.array([math.cos(i/360.), math.sin(i/360.), 0])
     print(v)
     return v
