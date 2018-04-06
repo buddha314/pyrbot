@@ -3,14 +3,19 @@ from flask_socketio import SocketIO, emit
 from threading import Lock
 import math
 
-from models import Agent
-from services import d
-
+from models import Agent, RadiusAngleTiler
+from services import d, angle
 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
+
+
+episode = 0
+episodes = 10
+steps = 100
+game_thread = None
 coyote_thread = None
 road_runner_thread = None
 thread_lock = Lock()
@@ -18,38 +23,93 @@ thread_lock = Lock()
 stage_height = 500
 stage_width = 500
 track_radius = 150
-
-roadRunner = Agent(name="Road Runner", xpos=stage_width/4, ypos=stage_height/4, speed=1)
-coyote = Agent(name="Coyote", xpos=stage_width/2, ypos=stage_height/2, speed=0.1)
-
+step = 0
 go = True
+capture_distance = 25
+
+roadRunner_initial_position = (stage_width/4, stage_height/4)
+coyote_initial_position = (stage_width/2, stage_height/2)
+
+roadRunner = Agent(name="Road Runner"
+   , xpos=roadRunner_initial_position[0], ypos=roadRunner_initial_position[1], speed=1)
+coyote = Agent(name="Coyote"
+   , xpos=coyote_initial_position[0], ypos=coyote_initial_position[1], speed=0.1)
+
+jose = models.RadiusAngleTiler(r_min=0, r_max=500, nbins=7)
 
 def update_road_runner():
-    count = 0
     global go
-    while go:
+    global step
+    global steps
+    global episode
+    global episodes
+    while episode <= episodes:
         socketio.sleep(0.05)
-        roadRunner.xpos = track_radius * math.cos( 2 * count/360. * math.pi) + stage_width / 2
-        roadRunner.ypos = track_radius * math.sin( 2 * count/360. * math.pi) + stage_height / 2
+        roadRunner.xpos = track_radius * math.cos( 2 * step/360. * math.pi) + stage_width / 2
+        roadRunner.ypos = track_radius * math.sin( 2 * step/360. * math.pi) + stage_height / 2
         socketio.emit('road_runner_position', {"xpos": roadRunner.xpos, "ypos": roadRunner.ypos}, namespace='/chase')
-        count += 1
+        step += 1
+        if step > steps:
+            go = False
+            episode += 1
+            reset()
+
+def update_players():
+    global go
+    global step
+    global steps
+    global episode
+    global episodes
+    while episode <= episodes:
+        r = d(roadRunner, coyote)
+        a = angle(roadRunner, coyote)
+        f = jose.feature_vec(a=a, r=r)
+        socketio.sleep(0.05)
+        roadRunner.xpos = track_radius * math.cos( 2 * step/360. * math.pi) + stage_width / 2
+        roadRunner.ypos = track_radius * math.sin( 2 * step/360. * math.pi) + stage_height / 2
+
+        newx, newy = coyote.moveTo(roadRunner)
+        coyote.xpos = newx
+        coyote.ypos = newy
+
+        socketio.emit('road_runner_position', {"xpos": roadRunner.xpos, "ypos": roadRunner.ypos}, namespace='/chase')
+        socketio.emit('coyote_position', {"xpos": coyote.xpos, "ypos": coyote.ypos}, namespace='/chase')
+        step += 1
+        if step > steps or d <= capture_distance:
+            episode +=1
+            reset()
+
 
 def update_coyote():
-    count = 0
     global go
-    while go:
+    global episode
+    global episodes
+    while episode <= episodes:
         socketio.sleep(0.05)
         newx, newy = coyote.moveTo(roadRunner)
         coyote.xpos = newx
         coyote.ypos = newy
         socketio.emit('coyote_position', {"xpos": coyote.xpos, "ypos": coyote.ypos}, namespace='/chase')
         if d(coyote, roadRunner) <= 30:
-            print("GOT HIM!")
             socketio.emit('episode_end', namespace='/chase')
             go = False
-        count += 1
+            episode += 1
+            reset()
 
-
+def reset():
+    global go
+    global step
+    global episode
+    socketio.emit('episode_end',data={"step": step, "episode":episode}, namespace='/chase')
+    roadRunner.xpos = roadRunner_initial_position[0]
+    roadRunner.ypos = roadRunner_initial_position[1]
+    socketio.emit('road_runner_position', {"xpos": roadRunner.xpos, "ypos": roadRunner.ypos}, namespace='/chase')
+    coyote.xpos = coyote_initial_position[0]
+    coyote.ypos = coyote_initial_position[1]
+    socketio.emit('coyote_position', {"xpos": coyote.xpos, "ypos": coyote.ypos}, namespace='/chase')
+    print("episode %s ended at step %s" % (episode, step))
+    go = True
+    step = 0
 
 @app.route('/')
 def index():
@@ -61,13 +121,10 @@ def index():
 @socketio.on('connect', namespace='/chase')
 def test_connect():
     print("connected, I think")
-    global road_runner_thread
-    global coyote_thread
+    global game_thread
     with thread_lock:
-        if road_runner_thread is None:
-            road_runner_thread = socketio.start_background_task(target=update_road_runner)
-        if coyote_thread is None:
-            coyote_thread = socketio.start_background_task(target=update_coyote)
+        if game_thread is None:
+            game_thread = socketio.start_background_task(target=update_players)
 
 @socketio.on('disconnect', namespace='/test')
 def test_disconnect():

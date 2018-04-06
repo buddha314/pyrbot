@@ -8,6 +8,7 @@
 </head>
 <body>
   <div id="stage"></div>
+  <div id="report"></div>
     <script type="text/javascript" src="{{url_for('static', filename='js/d3.v5.min.js')}}"></script>
   <script type="text/javascript">
   $(document).ready(function() {
@@ -25,13 +26,15 @@
     });
 
     socket.on('coyote_position', function(obj) {
-        console.log(obj);
+        //console.log(obj);
         coyote.attr('cx', obj.xpos);
         coyote.attr('cy', obj.ypos);
     });
 
-    socket.on('episode_end', function(){
+    socket.on('episode_end', function(data){
       svg.style("background-color", "red");
+      $('#report').append('<br>' + $('<div/>').text('Received #' + data.step + ': ' + data.episode).html());
+      svg.style("background-color", "transparent");
     })
 
   });
