@@ -4,6 +4,7 @@ from threading import Lock
 import math
 
 from models import Agent
+from services import d
 
 
 
@@ -19,10 +20,13 @@ stage_width = 500
 track_radius = 150
 
 roadRunner = Agent(name="Road Runner", xpos=stage_width/4, ypos=stage_height/4, speed=1)
-coyote = Agent(name="Coyote", xpos=stage_width/2, ypos=stage_height/2, speed=0.01)
+coyote = Agent(name="Coyote", xpos=stage_width/2, ypos=stage_height/2, speed=0.1)
 
-def update_road_runner(go=True):
-    count = 0;
+go = True
+
+def update_road_runner():
+    count = 0
+    global go
     while go:
         socketio.sleep(0.05)
         roadRunner.xpos = track_radius * math.cos( 2 * count/360. * math.pi) + stage_width / 2
@@ -30,14 +34,19 @@ def update_road_runner(go=True):
         socketio.emit('road_runner_position', {"xpos": roadRunner.xpos, "ypos": roadRunner.ypos}, namespace='/chase')
         count += 1
 
-def update_coyote(go=True):
-    count = 0;
+def update_coyote():
+    count = 0
+    global go
     while go:
         socketio.sleep(0.05)
         newx, newy = coyote.moveTo(roadRunner)
         coyote.xpos = newx
         coyote.ypos = newy
         socketio.emit('coyote_position', {"xpos": coyote.xpos, "ypos": coyote.ypos}, namespace='/chase')
+        if d(coyote, roadRunner) <= 30:
+            print("GOT HIM!")
+            socketio.emit('episode_end', namespace='/chase')
+            go = False
         count += 1
 
 
