@@ -14,16 +14,21 @@
     const namespace = '/chase';
     var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
-
     var svg = d3.select("#stage").append("svg:svg").attr('width', {{stage_width}}).attr('height', {{stage_height}});
-    var coyote = svg.append("circle").attr("cx", {{stage_width/2}}).attr("cy", {{stage_height/2}}).attr("r", 25).style("fill", "purple");
-    var road_runner = svg.append("circle").attr("cx", {{stage_width/4}}).attr("cy", {{stage_height/4}}).attr("r", 25).style("fill", "brown");
+    var coyote = svg.append("circle").attr("cx", {{coyote.xpos}}).attr("cy", {{coyote.ypos}}).attr("r", 25).style("fill", "purple");
+    var road_runner = svg.append("circle").attr("cx", {{roadRunner.xpos}}).attr("cy", {{roadRunner.ypos}}).attr("r", 25).style("fill", "brown");
 
-    socket.on('road_runner_position', function(pos) {
-        console.log(pos);
-        road_runner.attr('cx', pos.x);
-        road_runner.attr('cy', pos.y);
+    socket.on('road_runner_position', function(obj) {
+        road_runner.attr('cx', obj.xpos);
+        road_runner.attr('cy', obj.ypos);
     });
+
+    socket.on('coyote_position', function(obj) {
+        console.log(obj);
+        coyote.attr('cx', obj.xpos);
+        coyote.attr('cy', obj.ypos);
+    });
+
   });
   </script>
 </body>
