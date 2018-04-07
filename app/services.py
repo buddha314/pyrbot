@@ -7,6 +7,5 @@ def d(me, you):
     return dst
 
 def angle(me, you):
-    t = (you.ypos - me.ypos) / (you.xpos - me.xpos)
-    a = math.cos(t)
+    a = np.arctan2(you.ypos - me.ypos, you.xpos - me.xpos)
     return a

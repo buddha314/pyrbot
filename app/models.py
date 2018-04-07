@@ -1,5 +1,7 @@
 import json
 import math
+import numpy as np
+from services import d, angle
 
 class Agent:
     def __init__(self, xpos, ypos, name, speed):
@@ -9,14 +11,31 @@ class Agent:
         self.ypos=ypos
 
     def moveTo(self, target):
-        newx = self.speed * (target.xpos - self.xpos) + self.xpos
-        newy = self.speed * (target.ypos - self.ypos) + self.ypos
-        #print(" me: (%s, %s)  it: (%s, %s)   v: (%s,%s)" % (self.xpos, self.ypos, target.xpos, target.ypos, newx, newy))
-        return (newx, newy)
+        a = angle(self, target)
+        self.moveAlong(a,speed=self.speed)
+        return 0
+
+    """
+    Moves in the direction of the specified angle
+    """
+    def moveAlong(self, angle, speed=None):
+        if speed is None:
+            speed = self.speed
+        self.xpos = self.xpos + speed * math.cos(angle)
+        self.ypos = self.ypos + speed * math.sin(angle)
+        return 0
+
 
     def toJSON(self):
         return json.dumps(self, default=lambda o: o.__dict__,
             sort_keys=True, indent=4)
+
+    def chooseAction(self, abins):
+        c = np.random.choice(range(len(abins)+1))
+        if c > len(abins):
+            c = -1
+        return c
+
 
 """
 import math
@@ -25,7 +44,7 @@ jose = models.RadiusAngleTiler(r_min=0, r_max=500, nbins=7)
 jose.feature_vec(r=147,a=0.72)
 """
 class RadiusAngleTiler:
-    def __init__(self, r_min, r_max, nbins, a_min=-1, a_max=1):
+    def __init__(self, r_min, r_max, nbins, a_min=-math.pi, a_max=math.pi):
         self.nbins = nbins
         self.r_min = r_min
         self.r_max = r_max

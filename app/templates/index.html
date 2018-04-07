@@ -33,7 +33,7 @@
 
     socket.on('episode_end', function(data){
       svg.style("background-color", "red");
-      $('#report').append('<br>' + $('<div/>').text('Received #' + data.step + ': ' + data.episode).html());
+      $('#report').append('<br>' + $('<div/>').text('Episode ' + data.episode + ' stopped at step ' + data.step).html());
       svg.style("background-color", "transparent");
     })
 

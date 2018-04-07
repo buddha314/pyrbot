@@ -1,6 +1,7 @@
 from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 from threading import Lock
+import numpy as np
 import math
 
 from models import Agent, RadiusAngleTiler
@@ -25,18 +26,19 @@ stage_width = 500
 track_radius = 150
 step = 0
 go = True
-capture_distance = 25
+capture_distance = 35
 
 roadRunner_initial_position = (stage_width/4, stage_height/4)
 coyote_initial_position = (stage_width/2, stage_height/2)
 
 roadRunner = Agent(name="Road Runner"
-   , xpos=roadRunner_initial_position[0], ypos=roadRunner_initial_position[1], speed=1)
+   , xpos=roadRunner_initial_position[0], ypos=roadRunner_initial_position[1], speed=5)
 coyote = Agent(name="Coyote"
-   , xpos=coyote_initial_position[0], ypos=coyote_initial_position[1], speed=0.1)
+   , xpos=coyote_initial_position[0], ypos=coyote_initial_position[1], speed=1)
 
 jose = models.RadiusAngleTiler(r_min=0, r_max=500, nbins=7)
 
+"""
 def update_road_runner():
     global go
     global step
@@ -53,6 +55,7 @@ def update_road_runner():
             go = False
             episode += 1
             reset()
+"""
 
 def update_players():
     global go
@@ -65,21 +68,21 @@ def update_players():
         a = angle(roadRunner, coyote)
         f = jose.feature_vec(a=a, r=r)
         socketio.sleep(0.05)
-        roadRunner.xpos = track_radius * math.cos( 2 * step/360. * math.pi) + stage_width / 2
-        roadRunner.ypos = track_radius * math.sin( 2 * step/360. * math.pi) + stage_height / 2
 
-        newx, newy = coyote.moveTo(roadRunner)
-        coyote.xpos = newx
-        coyote.ypos = newy
+        c = roadRunner.chooseAction(jose.abins)
+        if c < len(jose.abins):
+            roadRunner.moveAlong(jose.abins[c][1])
+        coyote.moveTo(roadRunner)
 
         socketio.emit('road_runner_position', {"xpos": roadRunner.xpos, "ypos": roadRunner.ypos}, namespace='/chase')
         socketio.emit('coyote_position', {"xpos": coyote.xpos, "ypos": coyote.ypos}, namespace='/chase')
         step += 1
-        if step > steps or d <= capture_distance:
+        if step > steps or r <= capture_distance:
             episode +=1
             reset()
 
 
+"""
 def update_coyote():
     global go
     global episode
@@ -95,6 +98,7 @@ def update_coyote():
             go = False
             episode += 1
             reset()
+"""
 
 def reset():
     global go
