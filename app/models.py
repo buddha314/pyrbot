@@ -57,6 +57,7 @@ class Agent:
         self.memories.append(m)
 
     def update_theta(self):
+        print("memories cached: %s" % len(self.memories))
         self.theta_hat = self.theta
         return 0
 

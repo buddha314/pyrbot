@@ -85,6 +85,7 @@ def reset():
     coyote.ypos = coyote_initial_position[1]
     socketio.emit('coyote_position', {"xpos": coyote.xpos, "ypos": coyote.ypos}, namespace='/chase')
     print("episode %s ended at step %s" % (episode, step))
+    mike.game_over=False
     step = 0
 
 @app.route('/')
