@@ -1,14 +1,23 @@
 import json
-import math
+import math, random
 import numpy as np
 from services import d, angle
+from config import *
 
 class Agent:
-    def __init__(self, xpos, ypos, name, speed):
+
+    def __init__(self, xpos, ypos, name, speed
+        , action_space_dims, state_space_dims
+        , stage_width, stage_height):
         self.name = name
         self.speed = speed
         self.xpos=xpos
         self.ypos=ypos
+        self.stage_width=stage_width
+        self.stage_height=stage_height
+        self.memories=[]
+        self.theta = [random.random() for _ in range(state_space_dims+action_space_dims)]
+        self.theta_hat = self.theta
 
     def moveTo(self, target):
         a = angle(self, target)
@@ -21,8 +30,8 @@ class Agent:
     def moveAlong(self, angle, speed=None):
         if speed is None:
             speed = self.speed
-        self.xpos = self.xpos + speed * math.cos(angle)
-        self.ypos = self.ypos + speed * math.sin(angle)
+        self.xpos = (self.xpos + speed * math.cos(angle)) % self.stage_width
+        self.ypos = (self.ypos + speed * math.sin(angle)) % self.stage_height
         return 0
 
 
@@ -30,11 +39,26 @@ class Agent:
         return json.dumps(self, default=lambda o: o.__dict__,
             sort_keys=True, indent=4)
 
-    def chooseAction(self, abins):
-        c = np.random.choice(range(len(abins)+1))
-        if c > len(abins):
-            c = -1
+    def chooseAction(self, available_actions, state):
+        choices = [0]*len(available_actions)
+        for i in range(len(available_actions)):
+            v = [0]*len(available_actions)
+            v[i] = 1
+            choices[i] = np.concatenate([state, v]).dot(self.theta_hat)
+        c = np.argmax(choices)
+        #print("RR choices %s" % choices)
+        #print("RR best choice: %s" % np.argmax(choices))
+        c = np.random.choice(range(len(available_actions)))
+        if c == len(available_actions)-1:
+            print("I'M STAYING RIGHT HERE!!!")
         return c
+
+    def addMemory(self, m):
+        self.memories.append(m)
+
+    def update_theta(self):
+        self.theta_hat = self.theta
+        return 0
 
 
 """
@@ -53,6 +77,7 @@ class RadiusAngleTiler:
         self.setup_rbins()
         self.setup_abins()
 
+
     def setup_rbins(self):
         intv = (self.r_max-self.r_min)/(self.nbins-1.0)
         overlap = intv - 1.0*(self.r_max - self.r_min)/self.nbins
@@ -67,7 +92,7 @@ class RadiusAngleTiler:
           [self.a_min + i*(intv-overlap), self.a_min + (i+1)*(intv - overlap)+overlap] for i in range(self.nbins)
         ]
 
-    def feature_vec(self, a, r):
+    def state_vec(self, a, r):
         features = [0] * (len(self.rbins)+ len(self.abins))
         for i in range(self.nbins):
             if r >= self.rbins[i][0] and r <= self.rbins[i][1]:
@@ -75,3 +100,44 @@ class RadiusAngleTiler:
             if a >= self.abins[i][0] and a <= self.abins[i][1]:
                 features[self.nbins + i] = 1
         return features
+
+class Memory:
+    def __init__(self, episode, step, state_features, action_features, reward=0):
+        self.episode = episode
+        self.step=step
+        self.state_features = state_features
+        self.action_features = action_features
+        self.reward=reward
+
+class DM:
+    def __init__(self, tiler, action_space_dims, state_space_dims):
+        self.tiler = tiler
+        self.action_space_dims = action_space_dims
+        self.state_space_dims = state_space_dims
+        self.game_over = False
+
+    def present_options(self, step, player, opponent):
+        r = d(player, opponent)
+        a = angle(player, opponent)
+        state = self.tiler.state_vec(a=a, r=r)
+        available_actions = [1] * (len(self.tiler.abins) +1)  # last is None
+        # Check to add or remove actions at this point
+        r = {}
+        r['available_actions']=available_actions
+        r['state']=state
+        return r
+
+    def present_update(self, step, player, choice, npc):
+        if choice < self.action_space_dims - 1:
+            player.moveAlong(self.tiler.abins[choice][1])
+        reward = 0
+        if step > steps:
+            reward=escape_reward
+            self.game_over=True
+        if d(player, npc) <= capture_distance:
+            reward = capture_penalty
+            self.game_over=True
+        return reward
+
+    def game_over(self):
+        return self.game_over
