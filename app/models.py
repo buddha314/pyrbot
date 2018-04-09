@@ -39,19 +39,23 @@ class Agent:
         return json.dumps(self, default=lambda o: o.__dict__,
             sort_keys=True, indent=4)
 
-    def chooseAction(self, available_actions, state):
-        choices = [0]*len(available_actions)
-        for i in range(len(available_actions)):
-            v = [0]*len(available_actions)
+    #def chooseAction(self, available_actions, state):
+    def chooseAction(self, options):
+        l = len(options['available_actions'])
+        choices = [0]*l
+        for i in range(l):
+            v = [0]*l
             v[i] = 1
-            choices[i] = np.concatenate([state, v]).dot(self.theta_hat)
+            choices[i] = np.concatenate([options['state'], v]).dot(self.theta_hat)
         c = np.argmax(choices)
+        choice = [0]*l
+        choice[c] = 1
         #print("RR choices %s" % choices)
         #print("RR best choice: %s" % np.argmax(choices))
-        c = np.random.choice(range(len(available_actions)))
-        if c == len(available_actions)-1:
+        c = np.random.choice(range(l))
+        if c == l-1:
             print("I'M STAYING RIGHT HERE!!!")
-        return c
+        return choice
 
     def addMemory(self, m):
         self.memories.append(m)
@@ -103,12 +107,12 @@ class RadiusAngleTiler:
         return features
 
 class Memory:
-    def __init__(self, episode, step, state_features, action_features, reward=0):
+    def __init__(self, episode, step
+        ,current_state, current_action):
         self.episode = episode
         self.step=step
-        self.state_features = state_features
-        self.action_features = action_features
-        self.reward=reward
+        self.current_state = current_state
+        self.current_action = current_action
 
 class DM:
     def __init__(self, tiler, action_space_dims, state_space_dims):
@@ -117,10 +121,17 @@ class DM:
         self.state_space_dims = state_space_dims
         self.game_over = False
 
-    def present_options(self, step, player, opponent):
+    def get_current_state(self, player, opponent):
         r = d(player, opponent)
         a = angle(player, opponent)
         state = self.tiler.state_vec(a=a, r=r)
+        return state
+
+    def present_options(self, step, player, opponent):
+        #r = d(player, opponent)
+        #a = angle(player, opponent)
+        #state = self.tiler.state_vec(a=a, r=r)
+        state = self.get_current_state(player=player, opponent=opponent)
         available_actions = [1] * (len(self.tiler.abins) +1)  # last is None
         # Check to add or remove actions at this point
         r = {}
@@ -129,8 +140,13 @@ class DM:
         return r
 
     def present_update(self, step, player, choice, npc):
-        if choice < self.action_space_dims - 1:
-            player.moveAlong(self.tiler.abins[choice][1])
+        # Choice is a vector, this is inelegant, but I'll fix it later
+        c = np.argmax(choice)
+        #if choice < self.action_space_dims - 1:
+        if c < self.action_space_dims - 1:
+            player.moveAlong(self.tiler.abins[c][1])
+        npc.moveTo(player)
+
         reward = 0
         if step > steps:
             reward=escape_reward

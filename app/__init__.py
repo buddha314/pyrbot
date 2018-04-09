@@ -46,33 +46,41 @@ def update_players():
     global steps
     global episode
     global episodes
+
+    options = mike.present_options(step=step, player=roadRunner, opponent=coyote)
+
+    current_state = options['state']
+    current_action = roadRunner.chooseAction(options=options)
     while episode <= episodes:
         socketio.sleep(0.05)
+        # mike presents presents options
         options = mike.present_options(
             step=step,
             player=roadRunner,
             opponent=coyote)
-        choice = roadRunner.chooseAction(available_actions=options['available_actions'],
-            state=options['state'])
-        reward = mike.present_update(step=step, player=roadRunner, choice=choice, npc=coyote) # new state is applied internally to player
-        coyote.moveTo(roadRunner)
-
+        # rr chooses, saves his own state
+        choice = roadRunner.chooseAction(options=options)
+        m = Memory(episode=episode, step=step
+            ,current_state=options['state']
+            ,current_action=choice )
+        # mike rewards, moved roadRunner and Coyote to new states
+        reward = mike.present_update(step=step
+            , player=roadRunner # moved by Mike
+            , choice=choice
+            , npc=coyote) # Coyote is also moved by mike
+        m.reward = reward
+        m.next_state = mike.get_current_state(player=roadRunner,opponent=coyote)
+        # rr makes a memory of the initial state, his action, reward, new state
+        roadRunner.addMemory(m)
         socketio.emit('road_runner_position', {"xpos": roadRunner.xpos, "ypos": roadRunner.ypos}, namespace='/chase')
         socketio.emit('coyote_position', {"xpos": coyote.xpos, "ypos": coyote.ypos}, namespace='/chase')
         step += 1
-        m = Memory(episode=episode, step=step
-            , state_features=options['state']
-            , action_features=options['available_actions'], reward=0)
-        roadRunner.addMemory(m)
         if step % learning_interval == 0:
             print("Sleepy time!")
             roadRunner.update_theta()
         if mike.game_over:
             episode += 1
             reset()
-        #if step > steps or d(roadRunner, coyote) <= capture_distance:
-        #    episode +=1
-        #    reset()
 
 def reset():
     global step
