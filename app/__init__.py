@@ -75,10 +75,11 @@ def update_players():
         socketio.emit('road_runner_position', {"xpos": roadRunner.xpos, "ypos": roadRunner.ypos}, namespace='/chase')
         socketio.emit('coyote_position', {"xpos": coyote.xpos, "ypos": coyote.ypos}, namespace='/chase')
         step += 1
-        if step % learning_interval == 0:
+        if (episode + step) % learning_interval == 0:
             print("Sleepy time!")
             roadRunner.update_theta()
         if mike.game_over:
+            roadRunner.update_theta()
             episode += 1
             reset()
 

@@ -1,7 +1,7 @@
 import json
 import math, random
 import numpy as np
-from services import d, angle
+from services import d, angle, linearSGD
 from config import *
 
 class Agent:
@@ -34,12 +34,10 @@ class Agent:
         self.ypos = (self.ypos + speed * math.sin(angle)) % self.stage_height
         return 0
 
-
     def toJSON(self):
         return json.dumps(self, default=lambda o: o.__dict__,
             sort_keys=True, indent=4)
 
-    #def chooseAction(self, available_actions, state):
     def chooseAction(self, options):
         l = len(options['available_actions'])
         choices = [0]*l
@@ -47,21 +45,31 @@ class Agent:
             v = [0]*l
             v[i] = 1
             choices[i] = np.concatenate([options['state'], v]).dot(self.theta_hat)
-        c = np.argmax(choices)
+        if random.random() > greedy_epsilon:
+            c = np.argmax(choices)
+        else:
+            c = np.random.choice(range(l))  # greedy -epsilon choice
+            print("\tepsilon choice! %s" % c)
         choice = [0]*l
         choice[c] = 1
-        #print("RR choices %s" % choices)
-        #print("RR best choice: %s" % np.argmax(choices))
-        c = np.random.choice(range(l))
-        if c == l-1:
-            print("I'M STAYING RIGHT HERE!!!")
+        print("choice: %s" % c)
+
         return choice
 
     def addMemory(self, m):
         self.memories.append(m)
 
+    """
+    The player learns while sleeping
+    """
     def update_theta(self):
-        print("memories cached: %s" % len(self.memories))
+        n = min(memory_capacity, len(self.memories))
+        mems = self.memories[-(min(memory_capacity, len(self.memories))):]
+        y = [x.reward for x in mems]
+        X = np.array([np.concatenate([x.current_state, x.current_action]) for x in mems])
+        self.theta = linearSGD(X=X, y=y, epsilon=learning_epsilon, eta=learning_eta)
+        #print("\tnew theta: %s" % self.theta)
+        #print("\trewards: %s" % y)
         self.theta_hat = self.theta
         return 0
 
@@ -128,9 +136,6 @@ class DM:
         return state
 
     def present_options(self, step, player, opponent):
-        #r = d(player, opponent)
-        #a = angle(player, opponent)
-        #state = self.tiler.state_vec(a=a, r=r)
         state = self.get_current_state(player=player, opponent=opponent)
         available_actions = [1] * (len(self.tiler.abins) +1)  # last is None
         # Check to add or remove actions at this point
@@ -141,13 +146,13 @@ class DM:
 
     def present_update(self, step, player, choice, npc):
         # Choice is a vector, this is inelegant, but I'll fix it later
+        reward = 0
         c = np.argmax(choice)
-        #if choice < self.action_space_dims - 1:
         if c < self.action_space_dims - 1:
             player.moveAlong(self.tiler.abins[c][1])
+            reward = movement_penalty
         npc.moveTo(player)
 
-        reward = 0
         if step > steps:
             reward=escape_reward
             self.game_over=True
